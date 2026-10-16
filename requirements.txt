@@ -35,8 +35,11 @@ mediapipe>=0.10.9
 #   pip install demucs
 
 # ── Model training + generation (model/) ─────────────────
-torch>=2.2.0
+torch>=2.14.1,<3
 torchvision>=0.17.0
 scikit-learn>=1.4.0
 transformers>=4.40.0
 wandb>=0.17.0
+
+# Compare the checkpoint loader security floor before deserializing.
+packaging>=26.0,<27
