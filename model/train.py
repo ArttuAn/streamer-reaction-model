@@ -11,14 +11,15 @@ Only the MLP head is trained — the SigLIP encoder stays frozen.
 
 Usage:
     pip install transformers wandb
-    python train.py --wandb_key YOUR_KEY
-    python train.py --epochs 30 --batch_size 4 --wandb_key YOUR_KEY
-    python train.py --no_wandb   # disable wandb
+    python train.py                              # no external telemetry
+    python train.py --wandb                      # opt in to external metrics/metadata
+    python train.py --wandb --wandb-artifacts    # also upload media and checkpoints
+
+Use the provider's protected WANDB_API_KEY environment variable for credentials.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import time
@@ -32,6 +33,7 @@ from sklearn.metrics import f1_score
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+from cli import parse_args
 from dataset import N_EMOTIONS, EMOTION_CLASSES, AUDIO_DIM, build_loaders
 
 BASE = Path(__file__).parent
@@ -244,36 +246,18 @@ def _make_confusion_matrix(true_labels: list, pred_labels: list,
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Train SigLIP emotion predictor")
-    parser.add_argument("--dataset_dir", type=Path,  default=DEFAULT_DATASET)
-    parser.add_argument("--out",         type=Path,  default=DEFAULT_OUT)
-    parser.add_argument("--model_name",  type=str,   default=DEFAULT_MODEL)
-    parser.add_argument("--epochs",      type=int,   default=30)
-    parser.add_argument("--batch_size",  type=int,   default=4)
-    parser.add_argument("--lr",          type=float, default=1e-3)
-    parser.add_argument("--n_frames",    type=int,   default=4)
-    parser.add_argument("--workers",     type=int,   default=0)
-    parser.add_argument("--val_split",   type=float, default=0.15)
-    # wandb
-    parser.add_argument("--wandb_key",   type=str,   default=None,
-                        help="Weights & Biases API key")
-    parser.add_argument("--wandb_project", type=str, default="streamer-reaction-model")
-    parser.add_argument("--no_wandb",    action="store_true",
-                        help="Disable wandb logging")
-    args = parser.parse_args()
+    args = parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device} | Model: {args.model_name}")
 
     # ── wandb setup ──────────────────────────────────────────────────────
-    use_wandb = not args.no_wandb
+    use_wandb = args.wandb and not args.no_wandb
     run = None
     if use_wandb:
         try:
             import wandb
-            if args.wandb_key:
-                wandb.login(key=args.wandb_key)
             run = wandb.init(
                 project=args.wandb_project,
                 config={
@@ -305,7 +289,7 @@ def main():
         batch_size=args.batch_size,
         n_frames=args.n_frames,
         num_workers=args.workers,
-        wandb_run=run if use_wandb else None,
+        wandb_run=run if use_wandb and args.wandb_artifacts else None,
     )
     print(f"Train: {len(train_loader.dataset)} | Val: {len(val_loader.dataset)}")
 
@@ -337,7 +321,7 @@ def main():
 
         train_m = run_epoch(model, train_loader, optimizer, device, train=True,
                             class_weights=class_weights,
-                            wandb_run=run if use_wandb else None,
+                            wandb_run=run if use_wandb and args.wandb_artifacts else None,
                             epoch=epoch, global_step=global_step)
         val_m   = run_epoch(model, val_loader, optimizer, device, train=False,
                             class_weights=class_weights,
@@ -393,8 +377,8 @@ def main():
             }, ckpt_path)
             print(f"  → saved best_model.pt (val_FL={val_m['focal_loss']:.4f})")
 
-            # Log checkpoint as wandb artifact
-            if use_wandb and run:
+            # Model artifacts require a separate explicit opt-in.
+            if use_wandb and run and args.wandb_artifacts:
                 artifact = wandb.Artifact(
                     name="best_model",
                     type="model",
