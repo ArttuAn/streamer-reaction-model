@@ -32,6 +32,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from checkpoint_io import load_tensor_data
 from dataset import EMOTION_CLASSES, EMOTION_TO_IDX, sample_frames
 from generate import (DEFAULT_CHECKPOINT, DEFAULT_DATASET, DEFAULT_INDEX,
                       extract_features, generate_reaction, load_model,
@@ -277,7 +278,7 @@ def main():
         print("Build it first: python generate.py --build_index")
         return
 
-    index = torch.load(args.index, map_location="cpu")
+    index = load_tensor_data(args.index, map_location="cpu")
 
     results = {}
 

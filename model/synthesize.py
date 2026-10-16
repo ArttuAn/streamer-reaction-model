@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 import torch
 
+from checkpoint_io import load_tensor_data
 from dataset import EMOTION_CLASSES, N_EMOTIONS, sample_frames_rgb
 from generate import (DEFAULT_CHECKPOINT, DEFAULT_INDEX,
                       load_model_and_processor, predict_emotion_vector,
@@ -487,7 +488,7 @@ def synthesize_reaction(
 
     # Load model + index
     model, processor, n_frames = load_model_and_processor(checkpoint, device)
-    index = torch.load(index_path, map_location="cpu")
+    index = load_tensor_data(index_path, map_location="cpu")
 
     # Predict emotion from gameplay
     print(f"[synth] predicting emotion for {gameplay_path.name}...")

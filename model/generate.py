@@ -32,6 +32,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from checkpoint_io import load_tensor_data
 from dataset import (EMOTION_CLASSES, N_EMOTIONS, AUDIO_DIM,
                      get_soft_labels, sample_frames_rgb,
                      extract_gameplay_audio_features)
@@ -48,7 +49,7 @@ DEFAULT_INDEX      = BASE / "checkpoints" / "retrieval_index.pt"
 def load_model_and_processor(checkpoint: Path, device: torch.device):
     from transformers import AutoProcessor, AutoModel
 
-    ckpt       = torch.load(checkpoint, map_location=device)
+    ckpt       = load_tensor_data(checkpoint, map_location=device)
     model_name = ckpt.get("model_name", "google/siglip-base-patch16-224")
     n_frames   = ckpt.get("n_frames", 4)
 
@@ -380,7 +381,7 @@ def generate_reaction(
     model, processor, n_frames = load_model_and_processor(checkpoint, device)
 
     print(f"[generate] loading retrieval index...")
-    index = torch.load(index_path, map_location="cpu")
+    index = load_tensor_data(index_path, map_location="cpu")
 
     print(f"[generate] predicting emotion from {gameplay_path.name}...")
     pred_vec = predict_emotion_vector(model, processor, gameplay_path, n_frames, device)
@@ -424,7 +425,7 @@ def generate_demo(
     model, processor, n_frames = load_model_and_processor(checkpoint, device)
 
     print(f"[demo] loading retrieval index...")
-    index = torch.load(index_path, map_location="cpu")
+    index = load_tensor_data(index_path, map_location="cpu")
 
     total_dur = get_video_duration(gameplay_path)
     starts    = list(range(0, int(total_dur), segment_duration))
